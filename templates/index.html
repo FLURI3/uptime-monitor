@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Website Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { background:#0b0f16; color:#cfd8ff; font-family:Inter,Arial,sans-serif; padding:20px; }
+.card { background:#0f1724; padding:12px; border-radius:10px; margin-bottom:10px; }
+.up { color:#7ee787; }
+.down { color:#ff7b7b; }
+form { margin-bottom:20px; }
+input,button { background:#1e2a44; color:#fff; border:none; padding:6px 8px; border-radius:6px; margin:2px; }
+button:hover { background:#243458; cursor:pointer; }
+</style>
+</head>
+<body>
+<h2>Монитор сайтов</h2>
+
+<form method="post" action="/add">
+  <input name="name" placeholder="Название" required>
+  <input name="url" placeholder="https://example.com" required>
+  <input name="timeout" placeholder="Таймаут (сек)" type="number" value="10" style="width:110px">
+  <button type="submit">Добавить сайт</button>
+</form>
+
+{% for s in sites %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;">
+    <div>
+      <strong>{{s.name}}</strong><br>
+      <small>{{s.url}}</small><br>
+      <span class="{{ 'down' if (s.status is not none and (s.status==0 or s.status>=500)) else 'up' }}">
+        {{ 'Нет данных' if s.status is none else s.status }}
+      </span>
+    </div>
+    <div>
+      <button onclick="toggleHistory({{ s.id }}, {{ s.name|tojson }})">История</button>
+      <a href="/delete/{{s.id}}" style="color:#ff7b7b;text-decoration:none;">Удалить</a>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<div id="chartBox" class="card" style="display:none;">
+  <h3 id="chartTitle">История</h3>
+  <canvas id="rttChart"></canvas>
+  <button onclick="hideChart()">Скрыть график</button>
+</div>
+
+<script>
+let chart=null;
+function toggleHistory(id, name){
+  const box=document.getElementById('chartBox');
+  if(box.style.display==='block'){ hideChart(); return; }
+  fetch('/history/'+id)
+  .then(r=>r.json())
+  .then(data=>{
+    const labels=data.map(d=>new Date(d.ts*1000).toLocaleString()).reverse();
+    const rtts=data.map(d=>d.rtt).reverse();
+    const ctx=document.getElementById('rttChart').getContext('2d');
+    if(chart) chart.destroy();
+    chart=new Chart(ctx,{type:'line',data:{
+      labels,datasets:[{label:'RTT ms',data:rtts,fill:false}]
+    }});
+    document.getElementById('chartTitle').innerText=name;
+    box.style.display='block';
+  })
+}
+function hideChart(){
+  document.getElementById('chartBox').style.display='none';
+  if(chart) chart.destroy();
+}
+</script>
+</body>
+</html>
